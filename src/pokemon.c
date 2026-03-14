@@ -933,9 +933,12 @@ u32 CanUseAbilityPatch(struct PartyPokemon *pp)
 {
     u32 species = GetMonData(pp, MON_DATA_SPECIES, NULL);
     u32 form = GetMonData(pp, MON_DATA_FORM, NULL);
-    u32 hidden_ability = GetMonHiddenAbility(species, form);
+    u32 has_hidden_ability = (GetMonHiddenAbility(species, form) != 0);
 
-    return (hidden_ability != 0);
+    if (!has_hidden_ability)
+        return FALSE;
+
+    return (GET_MON_HIDDEN_ABILITY_BIT(pp) == 0);
 }
 
 BOOL CanUseRotomCatalog(struct PartyPokemon *pp)
@@ -1112,7 +1115,7 @@ u32 LONG_CALL UseItemMonAttrChangeCheck(struct PartyMenu *wk, void *dat)
         wk->args->species = GetMonData(pp, MON_DATA_FORM, NULL); // no form change
         sys_FreeMemoryEz(dat);
         PokeList_FormDemoOverlayLoad(wk);
-        TOGGLE_MON_HIDDEN_ABILITY_BIT(pp)
+        SET_MON_HIDDEN_ABILITY_BIT(pp)
         ResetPartyPokemonAbility(pp);
         Bag_TakeItem(bag, wk->args->itemId, 1, 11);
         return TRUE;
@@ -1484,6 +1487,41 @@ u32 LONG_CALL CheckIfMonsAreEqual(struct PartyPokemon *pokemon1, struct PartyPok
  */
 BOOL LONG_CALL CanUseItemOnMonInParty(struct Party *party, u16 itemID, s32 partyIdx, s32 moveIdx, u32 heapID) {
     struct PartyPokemon *mon = Party_GetMonByIndex(party, partyIdx);
+
+    if (itemID == ITEM_ABILITY_CAPSULE)
+    {
+        return CanUseAbilityCapsule(mon);
+    }
+
+    if (itemID == ITEM_ABILITY_PATCH)
+    {
+        return CanUseAbilityPatch(mon);
+    }
+
+    if (itemID == ITEM_DNA_SPLICERS_FUSE || itemID == ITEM_DNA_SPLICERS_UNFUSE)
+    {
+        return (CanUseDNASplicersGrabSplicerPos(mon, party) < 6);
+    }
+
+    if (IS_ITEM_NATURE_MINT(itemID))
+    {
+        u32 targetNature;
+        u32 currentNature = GET_MON_NATURE_OVERRIDE(mon);
+
+        for (targetNature = 0; targetNature < 25; targetNature++)
+        {
+            if (NatureToMintItem[targetNature] == itemID)
+                break;
+        }
+
+        if (targetNature == 25)
+            return FALSE;
+
+        if (currentNature == 0)
+            currentNature = GetMonNature(mon) + 1;
+
+        return (currentNature != targetNature + 1);
+    }
 
     if (GetItemData(itemID, ITEM_PARAM_LEVEL_UP, heapID) && GetMonData(mon, MON_DATA_LEVEL, NULL) == 100 && GetMonEvolution(party, mon, EVOCTX_LEVELUP, itemID, NULL))
     {
